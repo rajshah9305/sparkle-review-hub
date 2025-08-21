@@ -1,47 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import CodeEditor from '@/components/CodeEditor';
 import AnalysisPanel from '@/components/AnalysisPanel';
+import AIConfigModal from '@/components/AIConfigModal';
+import { Button } from '@/components/ui/button';
+import { Settings } from 'lucide-react';
+import { AnalysisResult, AIConfig } from '@/types/ai';
+import { getAIConfig } from '@/lib/storage';
+import { AIService } from '@/lib/ai-service';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResults, setAnalysisResults] = useState(null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResult[] | null>(null);
+  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const config = getAIConfig();
+    setAiConfig(config);
+  }, []);
 
   const handleCodeReview = async (code: string) => {
+    if (!aiConfig) {
+      setShowConfigModal(true);
+      toast({
+        title: 'AI Configuration Required',
+        description: 'Please configure your AI provider to analyze code.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsAnalyzing(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setAnalysisResults([
-        {
-          id: '1',
-          type: 'success',
-          category: 'Best Practices',
-          title: 'Good use of React Hooks',
-          description: 'Proper implementation of useState and useEffect hooks.',
-          suggestion: 'Continue following React hooks guidelines for optimal performance.'
-        },
-        {
-          id: '2',
-          type: 'warning',
-          category: 'Performance',
-          title: 'Missing dependency in useEffect',
-          description: 'The fetchData function should be included in the dependency array.',
-          line: 8,
-          suggestion: 'Add fetchData to the dependency array or wrap it with useCallback.'
-        },
-        {
-          id: '3',
-          type: 'error',
-          category: 'Error Handling',
-          title: 'Unhandled Promise Rejection',
-          description: 'Error handling could be improved with user-friendly messages.',
-          line: 15,
-          suggestion: 'Consider showing error messages to users and implementing retry logic.'
-        }
-      ]);
+    try {
+      const aiService = new AIService(aiConfig);
+      const results = await aiService.analyzeCode(code);
+      setAnalysisResults(results);
+    } catch (error) {
+      toast({
+        title: 'Analysis Failed',
+        description: error instanceof Error ? error.message : 'Failed to analyze code.',
+        variant: 'destructive',
+      });
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
+  };
+
+  const handleConfigSaved = (config: AIConfig) => {
+    setAiConfig(config);
   };
 
   return (
@@ -49,7 +59,24 @@ const Index = () => {
       <Header />
       
       <main className="container mx-auto p-6">
-        <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-8rem)]">
+        <div className="mb-4 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">AI Code Reviewer</h1>
+            <p className="text-foreground-secondary">
+              {aiConfig ? `Using ${aiConfig.provider}` : 'No AI provider configured'}
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setShowConfigModal(true)}
+            className="flex items-center gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Configure AI
+          </Button>
+        </div>
+        
+        <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
           {/* Code Editor Panel */}
           <div className="fade-in">
             <CodeEditor 
@@ -67,6 +94,12 @@ const Index = () => {
           </div>
         </div>
       </main>
+
+      <AIConfigModal
+        open={showConfigModal}
+        onOpenChange={setShowConfigModal}
+        onConfigSaved={handleConfigSaved}
+      />
     </div>
   );
 };

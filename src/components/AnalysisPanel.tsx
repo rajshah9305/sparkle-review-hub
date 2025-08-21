@@ -11,16 +11,7 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
-
-interface AnalysisResult {
-  id: string;
-  type: 'success' | 'warning' | 'error' | 'info';
-  category: string;
-  title: string;
-  description: string;
-  line?: number;
-  suggestion?: string;
-}
+import { AnalysisResult } from '@/types/ai';
 
 interface AnalysisPanelProps {
   isLoading: boolean;
